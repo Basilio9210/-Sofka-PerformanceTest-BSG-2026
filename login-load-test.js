@@ -18,12 +18,10 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 // -----------------------------------------------------------------------------
 // 1) INIT - Leer los datos de entrada desde el archivo CSV
 // -----------------------------------------------------------------------------
-// open() solo funciona en esta etapa (init). Lee el archivo como texto.
+
 const csv = open('./data/users.csv');
 
-// Convertimos el texto en una lista de objetos {user, passwd}.
-// - split por saltos de linea, se descarta la cabecera (slice(1)) y las lineas vacias.
-// - split(',') separa usuario y clave. Las claves del ejercicio no contienen comas.
+
 const users = csv
   .split(/\r?\n/)
   .slice(1)
@@ -41,12 +39,14 @@ const DURATION = __ENV.DURATION || '3m';     // duracion de la etapa de carga
 // -----------------------------------------------------------------------------
 // 2) OPTIONS - Escenario de carga y criterios de aceptacion
 // -----------------------------------------------------------------------------
-export const options = {
-  scenarios: {
-    login_load: {
+
       // constant-arrival-rate = "llegan X peticiones por segundo, pase lo que pase".
       // Es lo que garantiza los TPS: k6 crea los usuarios virtuales que haga falta
       // para sostener la tasa, aunque el servidor se ponga lento.
+
+export const options = {
+  scenarios: {
+    login_load: {
       executor: 'constant-arrival-rate',
       rate: RATE,                 // peticiones por unidad de tiempo
       timeUnit: '1s',             // ...por segundo => TPS
@@ -72,6 +72,8 @@ export const options = {
 // -----------------------------------------------------------------------------
 // 3) DEFAULT - Lo que hace cada iteracion (1 iteracion = 1 login)
 // -----------------------------------------------------------------------------
+
+
 export default function () {
   // Reparte los 5 usuarios del CSV en orden rotativo (round-robin):
   // iteracion 0 -> usuario 0, iteracion 1 -> usuario 1, ... iteracion 5 -> usuario 0
@@ -107,8 +109,7 @@ export default function () {
 // -----------------------------------------------------------------------------
 // 4) SUMMARY - Guardar el resumen al terminar
 // -----------------------------------------------------------------------------
-// Genera reports/textSummary.txt (mismo formato que el del ejercicio 2)
-// y reports/summary.json, ademas de mostrar el resumen en pantalla.
+
 export function handleSummary(data) {
   return {
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
