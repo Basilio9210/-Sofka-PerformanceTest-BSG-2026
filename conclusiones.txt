@@ -1,0 +1,67 @@
+CONCLUSIONES - EJERCICIO 1 (PRUEBA DE CARGA DEL LOGIN CON K6)
+Servicio: POST https://fakestoreapi.com/auth/login
+
+1. ESCENARIO EJECUTADO
+   - Herramienta: k6 v2.4.0 en Windows
+   - Carga: 25 peticiones por segundo sostenidas durante 3 minutos
+     (executor constant-arrival-rate; el minimo exigido es 20 TPS)
+   - Datos: 5 usuarios del archivo data/users.csv, en forma rotativa
+   - Ejecucion: 19:33:57 a 19:36:58 (hora de Colombia, 13/11/2026), 180,4 s
+   - Usuarios virtuales: 30 preasignados (tope 150); se usaron entre 8 y 11
+
+2. RESULTADOS OBTENIDOS
+   - Peticiones totales          : 4.501
+   - Rendimiento (http_reqs)     : 24,95 req/s              (criterio: >= 20)
+   - Tasa de error               : 0,00 % (0 de 4.501)      (criterio: < 3 %)
+   - Checks exitosos             : 100 %                    (criterio: > 97 %)
+   - Tiempo de respuesta (ms)    : promedio 383,72 | mediana 376,11 | minimo 323,44
+                                   p90 417,26 | p95 439,66 | p99 536,14 | maximo 1.203,7
+                                   (criterio: p95 < 1.500 ms)
+   - Datos transferidos          : 2,7 MB recibidos y 0,56 MB enviados
+
+3. EVALUACION DE CRITERIOS
+   [x] Rendimiento >= 20 TPS                (24,95 req/s)
+   [x] Tiempo de respuesta dentro de 1,5 s  (p95 = 439,66 ms; incluso el maximo,
+                                             1.203,7 ms, quedo por debajo de 1,5 s)
+   [x] Tasa de error < 3 %                  (0 %)
+   Resultado global: la prueba cumple todos los criterios y los 4 umbrales de k6.
+
+4. HALLAZGOS
+   a) Comportamiento estable: en ventanas de 10 s el tiempo promedio vario entre
+      376 y 400 ms, el p95 entre 418 y 592 ms y el rendimiento entre 24,1 y
+      25,3 req/s. No hubo degradacion a lo largo de los 3 minutos.
+   b) Un unico valor atipico: el maximo de 1.203,7 ms aparecio en una sola
+      ventana (aprox. segundo 140 a 150). No se repitio y no afecta el p95.
+   c) El tiempo se consume en el servidor: http_req_waiting (promedio 382,6 ms)
+      es casi igual a http_req_duration (383,7 ms). Conexion, TLS, envio y
+      recepcion son despreciables.
+   d) Reutilizacion de conexiones: con carga, el tiempo de bloqueo/conexion
+      promedio fue de 0,9 ms (maximo 196,7 ms, solo en las primeras peticiones).
+      En la prueba de humo de 1 req/s el promedio fue de unos 204 ms, porque
+      cada peticion abria una conexion nueva (handshake TLS incluido). Por eso la
+      latencia promedio fue menor con 25 TPS (384 ms) que con 1 TPS (594 ms).
+   e) Con 25 TPS y unos 0,38 s por peticion se necesitan en promedio unos 9-10
+      usuarios virtuales (ley de Little), coherente con los 8 a 11 observados.
+      Los 30 preasignados fueron mas que suficientes.
+   f) Todas las respuestas fueron 2xx con token; no se observaron errores.
+
+5. CONCLUSIONES Y RECOMENDACIONES
+   - El servicio de login soporta con holgura la carga solicitada: cumple 25 TPS
+     con p95 de 440 ms, es decir, unas 3,4 veces por debajo del limite de 1,5 s.
+   - Al no haber errores ni degradacion, esta prueba no permite conocer el
+     punto de quiebre. Para ello se recomienda una prueba escalonada (por
+     ejemplo 50, 100 y 150 TPS) hasta encontrar donde se rompen los umbrales.
+   - Se recomienda una prueba de resistencia (soak) de mayor duracion para
+     detectar degradacion progresiva.
+   - Limitaciones: se probo un servicio publico de terceros (fakestoreapi.com)
+     con 5 usuarios y un solo endpoint; los resultados dependen de la red y del
+     estado del servicio en ese momento, y no son extrapolables a un sistema
+     productivo. Por respeto al servicio, la carga fue moderada y corta.
+
+NOTAS DE DISENO
+   - Se uso constant-arrival-rate para garantizar la tasa de peticiones
+     independientemente de la latencia (modelo de carga abierto).
+   - El criterio de 1,5 s se evaluo sobre el percentil 95 (umbral p(95)<1500);
+     el maximo individual se reporta aparte. Aun asi, el maximo tambien cumplio.
+   - Evidencia: reports/reporte-k6.html (graficos de VUs y peticiones por segundo),
+     reports/textSummary.txt y reports/summary.json.
